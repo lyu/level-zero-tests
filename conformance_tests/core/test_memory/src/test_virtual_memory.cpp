@@ -6,14 +6,10 @@
  *
  */
 
-#include <chrono>
-#include <thread>
-
 #include "gtest/gtest.h"
 
 #include "utils/utils.hpp"
 #include "test_harness/test_harness.hpp"
-#include "logging/logging.hpp"
 
 #ifdef __linux__
 #include <unistd.h>
@@ -36,7 +32,7 @@ protected:
 public:
   ze_context_handle_t context;
   ze_device_handle_t device;
-  size_t pageSize = 0;
+  size_t pageSize = 1ul << 21;
   size_t allocationSize = (1024 * 1024);
   void *reservedVirtualMemory = nullptr;
   ze_physical_mem_handle_t reservedPhysicalDeviceMemory = nullptr;
@@ -148,7 +144,10 @@ TEST_F(
     zeVirtualMemoryTests,
     GivenPageAlignedSizeThenVirtualAndPhysicalHostMemoryReservedSuccessfully) {
 #ifdef __linux__
-  pageSize = sysconf(_SC_PAGE_SIZE);
+  const long os_page_size = sysconf(_SC_PAGE_SIZE);
+  if (os_page_size > 0) {
+    pageSize = static_cast<size_t>(os_page_size);
+  }
   allocationSize = lzt::create_page_aligned_size(allocationSize, pageSize);
   lzt::physical_host_memory_allocation(context, allocationSize,
                                        &reservedPhysicalHostMemory);
@@ -201,7 +200,10 @@ void RunGivenMappedReadWriteMemoryThenFillAndCopyWithMappedVirtualMemory(
 
   if (is_host_memory) {
 #ifdef __linux__
-    test.pageSize = sysconf(_SC_PAGE_SIZE);
+    const long os_page_size = sysconf(_SC_PAGE_SIZE);
+    if (os_page_size > 0) {
+      test.pageSize = static_cast<size_t>(os_page_size);
+    }
 #endif
   } else {
     lzt::query_page_size(test.context, test.device, test.allocationSize,
